@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NutricionAgricola"
+rootProject.name = "AgroGestionTerreno"
 include(":app")

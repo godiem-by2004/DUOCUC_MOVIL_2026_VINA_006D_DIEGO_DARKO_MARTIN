@@ -1,0 +1,7 @@
+# Finales de línea normalizados en el repo (evita diffs de solo CRLF/LF)
+* text=auto
+*.bat text eol=crlf
+gradlew text eol=lf
+*.png binary
+*.jpg binary
+*.jar binary

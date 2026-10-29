@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.NutricionAgricola" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- La app es solo tema claro: impide que el sistema (p. ej. "modo oscuro para apps" de MIUI)
+             la oscurezca a la fuerza, lo que deja textos claros sobre tarjetas blancas. API 29+. -->
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
 </resources>
