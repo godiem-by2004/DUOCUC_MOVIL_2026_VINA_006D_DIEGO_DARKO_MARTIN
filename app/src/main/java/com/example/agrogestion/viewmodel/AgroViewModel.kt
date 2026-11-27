@@ -68,6 +68,27 @@ class AgroViewModel(
                 gpsEstado = EstadoGps.REFERENCIA_PREDIO
             )
         }
+        refrescarClimaPredio(predio)
+    }
+
+    fun refrescarClimaPredio(predio: PredioInfo = _dashboardState.value.predioSeleccionado) {
+        viewModelScope.launch {
+            _dashboardState.update { it.copy(cargandoClima = true, errorClima = null) }
+            repository.obtenerClimaPredio(predio.latitudBase, predio.longitudBase)
+                .onSuccess { clima ->
+                    _dashboardState.update {
+                        it.copy(climaActual = clima, cargandoClima = false, errorClima = null)
+                    }
+                }
+                .onFailure {
+                    _dashboardState.update {
+                        it.copy(
+                            cargandoClima = false,
+                            errorClima = "Sin conexión al servicio meteorológico"
+                        )
+                    }
+                }
+        }
     }
 
     fun actualizarFiltroHistorial(query: String) {
@@ -254,15 +275,21 @@ class AgroViewModel(
             _dashboardState.update {
                 it.copy(
                     sincronizando = true,
-                    mensajeSincronizacion = "Sincronizando registros locales (simulado)..."
+                    mensajeSincronizacion = "Conectando con microservicio Spring Boot..."
                 )
             }
-            delay(1200)
-            repository.sincronizarPendientes()
+            val exito = repository.sincronizarPendientes()
+            if (exito) {
+                repository.refrescarDesdeServidor()
+            }
             _dashboardState.update {
                 it.copy(
                     sincronizando = false,
-                    mensajeSincronizacion = "Sincronización simulada completada."
+                    mensajeSincronizacion = if (exito) {
+                        "Sincronizado con servidor central Spring Boot."
+                    } else {
+                        "Servidor no disponible. Datos respaldados en Room."
+                    }
                 )
             }
             delay(3500)

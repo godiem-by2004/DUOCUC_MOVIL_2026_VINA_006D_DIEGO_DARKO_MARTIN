@@ -174,6 +174,7 @@ fun AppNavigation(viewModel: AgroViewModel, loginViewModel: LoginViewModel) {
                     onNavigateNuevoRegistro = { navegarDesdeMenu(navController, DestinoAgro.NuevoRegistro.ruta) },
                     onNavigateFertirriego = { navegarDesdeMenu(navController, DestinoAgro.Fertirriego.ruta) },
                     onSyncClick = { viewModel.sincronizarConServidorCentral() },
+                    onRefreshClima = { viewModel.refrescarClimaPredio() },
                     onCerrarSesion = cerrarSesion
                 )
             }

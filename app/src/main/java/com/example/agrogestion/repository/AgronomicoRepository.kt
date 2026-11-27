@@ -2,17 +2,37 @@ package com.example.agrogestion.repository
 
 import com.example.agrogestion.data.local.RegistroDao
 import com.example.agrogestion.data.local.RegistroEntity
+import com.example.agrogestion.data.remote.AgroApiService
+import com.example.agrogestion.data.remote.ClimaActualDto
+import com.example.agrogestion.data.remote.ClimaApiService
+import com.example.agrogestion.data.remote.RetrofitClient
+import com.example.agrogestion.data.remote.toDto
+import com.example.agrogestion.data.remote.toEntity
 import com.example.agrogestion.model.CatalogoAgronomico
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
-class AgronomicoRepository(private val dao: RegistroDao) {
+class AgronomicoRepository(
+    private val dao: RegistroDao,
+    private val api: AgroApiService = RetrofitClient.agroApi,
+    private val climaApi: ClimaApiService = RetrofitClient.climaApi
+) {
 
     val registros: Flow<List<RegistroEntity>> = dao.obtenerTodos()
 
-    /**
-     * Datos de DEMOSTRACIÓN (dataset ficticio del caso). Se insertan solo si la tabla está vacía.
-     * Las fechas son relativas a "ahora" para que Hoy/Ayer siempre sean coherentes.
-     */
+    suspend fun obtenerClimaPredio(latitud: Double, longitud: Double): Result<ClimaActualDto> =
+        runCatching {
+            climaApi.obtenerClimaActual(latitud, longitud).current
+                ?: error("Respuesta climática vacía")
+        }
+
+    suspend fun refrescarDesdeServidor(): Boolean =
+        runCatching {
+            val remotos = api.obtenerRegistros()
+            remotos.forEach { dao.insertar(it.toEntity()) }
+            true
+        }.getOrElse { false }
+
     suspend fun inicializarSemillaSiVacio() {
         if (dao.contarRegistros() != 0) return
         val ahora = System.currentTimeMillis()
@@ -56,10 +76,6 @@ class AgronomicoRepository(private val dao: RegistroDao) {
         ).forEach { dao.insertar(it) }
     }
 
-    /**
-     * Guarda una muestra nueva. El repositorio es la única capa que agrega lo que depende
-     * de reglas de negocio (recomendación) y de la hora real del guardado.
-     */
     suspend fun guardarMuestra(muestra: RegistroEntity): Long {
         val conCalculos = muestra.copy(
             observacionesFoliares = muestra.observacionesFoliares.ifBlank { "Muestra foliar verificada en terreno" },
@@ -70,20 +86,37 @@ class AgronomicoRepository(private val dao: RegistroDao) {
             fechaMillis = System.currentTimeMillis(),
             sincronizado = false
         )
-        return dao.insertar(conCalculos)
+        val idLocal = dao.insertar(conCalculos)
+        val enviado = runCatching { api.crearRegistro(conCalculos.copy(id = idLocal).toDto()) }.isSuccess
+        if (enviado) {
+            dao.marcarTodosSincronizados()
+        }
+        return idLocal
     }
 
     suspend fun actualizarObservaciones(id: Long, texto: String) {
-        dao.actualizarObservaciones(id, texto.trim())
+        val limpio = texto.trim()
+        dao.actualizarObservaciones(id, limpio)
+        runCatching {
+            val actual = dao.obtenerTodos().first().find { it.id == id } ?: return
+            api.actualizarRegistro(id, actual.copy(observacionesFoliares = limpio).toDto())
+        }
     }
 
     suspend fun eliminarRegistro(id: Long) {
         dao.eliminarPorId(id)
+        runCatching { api.eliminarRegistro(id) }
     }
 
-    /** SIMULADO: marca como sincronizado. En la EFT se reemplaza por Retrofit + Spring Boot. */
-    suspend fun sincronizarPendientes() {
-        dao.marcarTodosSincronizados()
+    suspend fun sincronizarPendientes(): Boolean {
+        val pendientes = dao.obtenerTodos().first().filter { !it.sincronizado }
+        return runCatching {
+            if (pendientes.isNotEmpty()) {
+                api.sincronizarLote(pendientes.map { it.toDto() })
+            }
+            dao.marcarTodosSincronizados()
+            true
+        }.getOrElse { false }
     }
 
     private fun generarRecomendacion(

@@ -21,8 +21,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("agrogestion-release.jks")
+            storePassword = "agro2026"
+            keyAlias = "agrogestion_key"
+            keyPassword = "agro2026"
+        }
+    }
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }
@@ -76,4 +85,13 @@ dependencies {
     // 4. Carga de imágenes (Coil): muestra las fotos foliares guardadas en disco.
     //    La cámara se usa con ActivityResultContracts.TakePicture + FileProvider (no requiere CameraX).
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // 5. Retrofit + Gson + Logging (Microservicios Spring Boot y API Externa)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // 6. Pruebas Unitarias (IE 3.2.1 - Cobertura >= 80%)
+    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

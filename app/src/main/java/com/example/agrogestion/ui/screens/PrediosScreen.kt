@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.SatelliteAlt
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -82,6 +84,7 @@ fun PrediosScreen(
     onNavigateNuevoRegistro: () -> Unit,
     onNavigateFertirriego: () -> Unit,
     onSyncClick: () -> Unit,
+    onRefreshClima: () -> Unit = {},
     onCerrarSesion: () -> Unit = {}
 ) {
     var menuPrediosAbierto by remember { mutableStateOf(false) }
@@ -548,6 +551,119 @@ fun PrediosScreen(
                                     },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
+                                    color = AgroTextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Tarjeta API Externa Open-Meteo (Clima en tiempo real del predio - IE 3.1.4)
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Thermostat,
+                                    contentDescription = null,
+                                    tint = AgroPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "CLIMA EN TIEMPO REAL · OPEN-METEO",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AgroTextSecondary
+                                )
+                            }
+                            androidx.compose.material3.IconButton(
+                                onClick = onRefreshClima,
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Actualizar clima",
+                                    tint = AgroPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        when {
+                            uiState.cargandoClima -> {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = AgroPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Consultando estación meteorológica...",
+                                        fontSize = 13.sp,
+                                        color = AgroTextSecondary
+                                    )
+                                }
+                            }
+                            uiState.climaActual != null -> {
+                                val clima = uiState.climaActual
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "${clima.temperaturaCelsius} °C",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = AgroTextPrimary
+                                        )
+                                        Text(
+                                            text = "Temperatura",
+                                            fontSize = 12.sp,
+                                            color = AgroTextSecondary
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "${clima.humedadRelativa}% HR",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AgroTextPrimary
+                                        )
+                                        Text(
+                                            text = "Viento: ${clima.vientoKmh} km/h",
+                                            fontSize = 12.sp,
+                                            color = AgroTextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                            uiState.errorClima != null -> {
+                                Text(
+                                    text = uiState.errorClima,
+                                    color = com.example.agrogestion.ui.theme.AgroWarningRed,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = "Toque actualizar para ver el clima",
+                                    fontSize = 13.sp,
                                     color = AgroTextSecondary
                                 )
                             }

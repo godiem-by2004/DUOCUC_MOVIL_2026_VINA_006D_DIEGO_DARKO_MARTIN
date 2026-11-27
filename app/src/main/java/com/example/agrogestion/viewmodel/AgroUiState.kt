@@ -2,6 +2,7 @@ package com.example.agrogestion.viewmodel
 
 import com.example.agrogestion.data.local.RegistroEntity
 import com.example.agrogestion.model.BalanceElemento
+import com.example.agrogestion.data.remote.ClimaActualDto
 import com.example.agrogestion.model.CatalogoAgronomico
 import com.example.agrogestion.model.PredioInfo
 import com.example.agrogestion.model.RequerimientoNutricional
@@ -85,7 +86,10 @@ data class AgroDashboardUiState(
     val filtroHistorial: String = "",
     val nombreAsesor: String = "Ing. Agrónomo en Turno",
     val sincronizando: Boolean = false,
-    val mensajeSincronizacion: String? = null
+    val mensajeSincronizacion: String? = null,
+    val climaActual: ClimaActualDto? = null,
+    val cargandoClima: Boolean = false,
+    val errorClima: String? = null
 ) {
     val pendientesSincronizar: Int
         get() = registros.count { !it.sincronizado }
