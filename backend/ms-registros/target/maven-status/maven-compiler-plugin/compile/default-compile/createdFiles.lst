@@ -1,4 +1,0 @@
-com\agrogestion\registros\RegistrosApplication.class
-com\agrogestion\registros\model\RegistroTerreno.class
-com\agrogestion\registros\controller\RegistroTerrenoController.class
-com\agrogestion\registros\repository\RegistroTerrenoRepository.class
