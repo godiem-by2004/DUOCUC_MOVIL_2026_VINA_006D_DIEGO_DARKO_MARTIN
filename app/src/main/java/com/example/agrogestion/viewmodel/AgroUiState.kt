@@ -81,6 +81,7 @@ data class FormularioUiState(
 }
 
 data class AgroDashboardUiState(
+    val prediosDisponibles: List<PredioInfo> = CatalogoAgronomico.prediosDisponibles,
     val predioSeleccionado: PredioInfo = CatalogoAgronomico.prediosDisponibles.first(),
     val registros: List<RegistroEntity> = emptyList(),
     val filtroHistorial: String = "",

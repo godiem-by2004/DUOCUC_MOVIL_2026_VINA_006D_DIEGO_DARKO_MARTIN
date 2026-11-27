@@ -42,9 +42,25 @@ class AgroViewModel(
         }
         viewModelScope.launch {
             userDataStore.predioActivoId.collectLatest { id ->
-                val encontrado = CatalogoAgronomico.prediosDisponibles.find { it.id == id }
-                    ?: CatalogoAgronomico.prediosDisponibles.first()
+                val prediosList = _dashboardState.value.prediosDisponibles
+                val encontrado = prediosList.find { it.id == id } ?: prediosList.first()
                 aplicarPredio(encontrado)
+            }
+        }
+        
+        cargarPrediosRemotos()
+    }
+
+    private fun cargarPrediosRemotos() {
+        viewModelScope.launch {
+            repository.obtenerPrediosCatalogo().onSuccess { prediosRemotos ->
+                if (prediosRemotos.isNotEmpty()) {
+                    _dashboardState.update { it.copy(prediosDisponibles = prediosRemotos) }
+                    // Update selection if necessary
+                    val currentId = _dashboardState.value.predioSeleccionado.id
+                    val encontrado = prediosRemotos.find { it.id == currentId } ?: prediosRemotos.first()
+                    aplicarPredio(encontrado)
+                }
             }
         }
     }
@@ -278,19 +294,22 @@ class AgroViewModel(
                     mensajeSincronizacion = "Conectando con microservicio Spring Boot..."
                 )
             }
-            val exito = repository.sincronizarPendientes()
-            if (exito) {
+            try {
+                repository.sincronizarPendientes()
                 repository.refrescarDesdeServidor()
-            }
-            _dashboardState.update {
-                it.copy(
-                    sincronizando = false,
-                    mensajeSincronizacion = if (exito) {
-                        "Sincronizado con servidor central Spring Boot."
-                    } else {
-                        "Servidor no disponible. Datos respaldados en Room."
-                    }
-                )
+                _dashboardState.update {
+                    it.copy(
+                        sincronizando = false,
+                        mensajeSincronizacion = "Sincronizado con servidor central Spring Boot."
+                    )
+                }
+            } catch (e: Exception) {
+                _dashboardState.update {
+                    it.copy(
+                        sincronizando = false,
+                        mensajeSincronizacion = "Error de red: ${e.message ?: "Servidor no disponible"}. Datos respaldados en Room."
+                    )
+                }
             }
             delay(3500)
             _dashboardState.update { it.copy(mensajeSincronizacion = null) }

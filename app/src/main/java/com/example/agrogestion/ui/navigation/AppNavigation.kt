@@ -181,6 +181,7 @@ fun AppNavigation(viewModel: AgroViewModel, loginViewModel: LoginViewModel) {
 
             composable(DestinoAgro.NuevoRegistro.ruta) {
                 NuevoRegistroScreen(
+                    prediosDisponibles = dashboardState.prediosDisponibles,
                     formState = formState,
                     pendientesRoom = dashboardState.pendientesSincronizar,
                     onPredioChange = viewModel::onPredioFormChange,

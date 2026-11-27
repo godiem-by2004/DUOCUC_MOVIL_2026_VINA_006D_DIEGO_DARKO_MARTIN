@@ -28,6 +28,11 @@ interface AgroApiService {
     suspend fun eliminarRegistro(@Path("id") id: Long): Response<Unit>
 }
 
+interface CatalogoApiService {
+    @GET("api/catalogo/predios")
+    suspend fun obtenerPredios(): List<Map<String, Any>>
+}
+
 interface ClimaApiService {
     @GET("v1/forecast")
     suspend fun obtenerClimaActual(
@@ -39,6 +44,7 @@ interface ClimaApiService {
 
 object RetrofitClient {
     private const val BASE_URL_BACKEND = "http://10.0.2.2:8081/"
+    private const val BASE_URL_CATALOGO = "http://10.0.2.2:8082/"
     private const val BASE_URL_CLIMA = "https://api.open-meteo.com/"
 
     private val okHttpClient: OkHttpClient by lazy {
@@ -59,6 +65,15 @@ object RetrofitClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(AgroApiService::class.java)
+    }
+
+    val catalogoApi: CatalogoApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL_CATALOGO)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(CatalogoApiService::class.java)
     }
 
     val climaApi: ClimaApiService by lazy {

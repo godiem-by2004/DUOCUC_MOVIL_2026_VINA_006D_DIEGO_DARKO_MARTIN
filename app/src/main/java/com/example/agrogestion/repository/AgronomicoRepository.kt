@@ -3,18 +3,21 @@ package com.example.agrogestion.repository
 import com.example.agrogestion.data.local.RegistroDao
 import com.example.agrogestion.data.local.RegistroEntity
 import com.example.agrogestion.data.remote.AgroApiService
+import com.example.agrogestion.data.remote.CatalogoApiService
 import com.example.agrogestion.data.remote.ClimaActualDto
 import com.example.agrogestion.data.remote.ClimaApiService
 import com.example.agrogestion.data.remote.RetrofitClient
 import com.example.agrogestion.data.remote.toDto
 import com.example.agrogestion.data.remote.toEntity
 import com.example.agrogestion.model.CatalogoAgronomico
+import com.example.agrogestion.model.PredioInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 class AgronomicoRepository(
     private val dao: RegistroDao,
     private val api: AgroApiService = RetrofitClient.agroApi,
+    private val catalogoApi: CatalogoApiService = RetrofitClient.catalogoApi,
     private val climaApi: ClimaApiService = RetrofitClient.climaApi
 ) {
 
@@ -24,6 +27,30 @@ class AgronomicoRepository(
         runCatching {
             climaApi.obtenerClimaActual(latitud, longitud).current
                 ?: error("Respuesta climática vacía")
+        }
+
+    suspend fun obtenerPrediosCatalogo(): Result<List<PredioInfo>> =
+        runCatching {
+            val response = catalogoApi.obtenerPredios()
+            response.map {
+                PredioInfo(
+                    id = it["id"] as String,
+                    nombre = it["nombre"] as String,
+                    ubicacion = it["ubicacion"] as String,
+                    cultivo = it["cultivo"] as String,
+                    superficieHa = (it["superficieHa"] as Double),
+                    latitudBase = -32.882, // Valores mockeados por defecto ya que no vienen del backend
+                    longitudBase = -71.248,
+                    cuartelPrincipal = "Cuartel Central",
+                    sistemaRiego = "Riego por Goteo (Autocompensado)",
+                    etapaActual = "Crecimiento",
+                    subEtapaDetalle = "Desarrollo",
+                    vigorEstado = "Estable",
+                    proximoFertirriegoHora = "06:00",
+                    proximoFertirriegoSector = "Sector 1",
+                    laminaRiegoM3Ha = 45.0
+                )
+            }
         }
 
     suspend fun refrescarDesdeServidor(): Boolean =
@@ -87,9 +114,12 @@ class AgronomicoRepository(
             sincronizado = false
         )
         val idLocal = dao.insertar(conCalculos)
-        val enviado = runCatching { api.crearRegistro(conCalculos.copy(id = idLocal).toDto()) }.isSuccess
-        if (enviado) {
-            dao.marcarTodosSincronizados()
+        val result = runCatching { api.crearRegistro(conCalculos.copy(id = idLocal).toDto()) }
+        if (result.isSuccess) {
+            val remoteId = result.getOrNull()?.id
+            if (remoteId != null) {
+                dao.marcarSincronizado(idLocal, remoteId)
+            }
         }
         return idLocal
     }
@@ -99,24 +129,34 @@ class AgronomicoRepository(
         dao.actualizarObservaciones(id, limpio)
         runCatching {
             val actual = dao.obtenerTodos().first().find { it.id == id } ?: return
-            api.actualizarRegistro(id, actual.copy(observacionesFoliares = limpio).toDto())
+            if (actual.remoteId != null) {
+                api.actualizarRegistro(actual.remoteId, actual.copy(observacionesFoliares = limpio).toDto())
+            }
         }
     }
 
     suspend fun eliminarRegistro(id: Long) {
+        val actual = dao.obtenerTodos().first().find { it.id == id }
         dao.eliminarPorId(id)
-        runCatching { api.eliminarRegistro(id) }
+        if (actual?.remoteId != null) {
+            runCatching { api.eliminarRegistro(actual.remoteId) }
+        }
     }
 
     suspend fun sincronizarPendientes(): Boolean {
         val pendientes = dao.obtenerTodos().first().filter { !it.sincronizado }
+        if (pendientes.isEmpty()) return true
+        
         return runCatching {
-            if (pendientes.isNotEmpty()) {
-                api.sincronizarLote(pendientes.map { it.toDto() })
+            val response = api.sincronizarLote(pendientes.map { it.toDto() })
+            // Asumimos que la API nos devuelve la lista con los remoteIds
+            response.forEach { rem ->
+                if (rem.localId != null && rem.id != null) {
+                    dao.marcarSincronizado(rem.localId, rem.id)
+                }
             }
-            dao.marcarTodosSincronizados()
             true
-        }.getOrElse { false }
+        }.getOrElse { throw it } // Lanza el error para que el ViewModel lo atrape y muestre
     }
 
     private fun generarRecomendacion(

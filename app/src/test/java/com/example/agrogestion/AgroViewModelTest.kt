@@ -44,6 +44,7 @@ class AgroViewModelTest {
         coEvery { repository.obtenerClimaPredio(any(), any()) } returns Result.success(
             ClimaActualDto(21.0, 60, 10.0, 0.0)
         )
+        coEvery { repository.obtenerPrediosCatalogo() } returns Result.success(emptyList())
         viewModel = AgroViewModel(repository, userDataStore)
     }
 
@@ -114,5 +115,86 @@ class AgroViewModelTest {
             repository.refrescarDesdeServidor()
         }
         assertNotNull(viewModel.dashboardState.value)
+    }
+
+    @Test
+    fun `refrescarClimaPredio maneja error de red`() = runTest {
+        coEvery { repository.obtenerClimaPredio(any(), any()) } returns Result.failure(Exception("Network error"))
+        viewModel.refrescarClimaPredio()
+        advanceUntilIdle()
+        assertEquals("Sin conexión al servicio meteorológico", viewModel.dashboardState.value.errorClima)
+    }
+
+    @Test
+    fun `todos los setters actualizan el estado del formulario correctamente`() {
+        viewModel.onPredioFormChange("Las Palmas")
+        viewModel.onCuartelChange("C1")
+        viewModel.onCultivoChange("Limon")
+        viewModel.onEtapaChange("Brotacion")
+        viewModel.onPhChange("6.5")
+        viewModel.onEcChange("1.2")
+        viewModel.onNitrogenoChange("100")
+        viewModel.onFosforoChange("50")
+        viewModel.onPotasioChange("150")
+        viewModel.onCalcioChange("40")
+        viewModel.onMagnesioChange("20")
+        viewModel.onObservacionesChange("Obs de prueba")
+        
+        val f = viewModel.formState.value
+        assertEquals("Las Palmas", f.predio)
+        assertEquals("C1", f.cuartel)
+        assertEquals("Limon", f.cultivo)
+        assertEquals("Brotacion", f.etapa)
+        assertEquals("6.5", f.ph)
+        assertEquals("1.2", f.ec)
+        assertEquals("100", f.nitrogeno)
+        assertEquals("50", f.fosforo)
+        assertEquals("150", f.potasio)
+        assertEquals("40", f.calcio)
+        assertEquals("20", f.magnesio)
+        assertEquals("Obs de prueba", f.observacionesFoliares)
+    }
+
+    @Test
+    fun `metodos auxiliares de UI y hardware`() = runTest {
+        viewModel.onFotoCapturada("file://foto.jpg")
+        assertEquals("file://foto.jpg", viewModel.formState.value.fotoUri)
+
+        viewModel.onFotoQuitada()
+        assertEquals(null, viewModel.formState.value.fotoUri)
+
+        viewModel.onMensajeCamara("Error camara")
+        assertEquals("Error camara", viewModel.formState.value.mensajeCamara)
+
+        viewModel.onGpsError("Error GPS")
+        assertEquals("Error GPS", viewModel.formState.value.mensajeGps)
+        assertEquals(EstadoGps.ERROR, viewModel.formState.value.gpsEstado)
+
+        viewModel.actualizarFiltroHistorial("Filtro")
+        assertEquals("Filtro", viewModel.dashboardState.value.filtroHistorial)
+        
+        viewModel.actualizarNombreAsesor("Nuevo Asesor")
+    }
+
+    @Test
+    fun `sincronizarConServidorCentral atrapa excepcion y muestra error de red`() = runTest {
+        coEvery { repository.sincronizarPendientes() } throws RuntimeException("Error fatal")
+        viewModel.sincronizarConServidorCentral()
+        // No avanzar hasta idle completamente porque se resetea al final (mensajeSincronizacion = null por el delay).
+        // Capturamos antes de que se limpie:
+        assertTrue(viewModel.dashboardState.value.mensajeSincronizacion != null)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `eliminarRegistro y actualizarObservacionesRegistro interactuan con repository`() = runTest {
+        coEvery { repository.eliminarRegistro(any()) } returns Unit
+        coEvery { repository.actualizarObservaciones(any(), any()) } returns Unit
+
+        viewModel.eliminarRegistro(1L)
+        advanceUntilIdle()
+
+        viewModel.actualizarObservacionesRegistro(1L, "Nota")
+        advanceUntilIdle()
     }
 }

@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "registros_terreno")
 data class RegistroEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val remoteId: Long? = null,
     val predio: String,
     val ubicacion: String,
     val cuartel: String,

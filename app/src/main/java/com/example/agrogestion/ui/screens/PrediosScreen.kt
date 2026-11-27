@@ -219,7 +219,7 @@ fun PrediosScreen(
                                 expanded = menuPrediosAbierto,
                                 onDismissRequest = { menuPrediosAbierto = false }
                             ) {
-                                CatalogoAgronomico.prediosDisponibles.forEach { opcion ->
+                                uiState.prediosDisponibles.forEach { opcion ->
                                     DropdownMenuItem(
                                         text = {
                                             Column {

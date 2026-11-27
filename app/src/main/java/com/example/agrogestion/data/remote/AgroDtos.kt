@@ -28,6 +28,7 @@ data class RegistroDto(
 )
 
 fun RegistroEntity.toDto() = RegistroDto(
+    id = remoteId,
     localId = id,
     predio = predio,
     ubicacion = ubicacion,
@@ -51,7 +52,8 @@ fun RegistroEntity.toDto() = RegistroDto(
 )
 
 fun RegistroDto.toEntity() = RegistroEntity(
-    id = localId ?: id ?: 0L,
+    id = localId ?: 0L,
+    remoteId = id,
     predio = predio,
     ubicacion = ubicacion,
     cuartel = cuartel,

@@ -27,9 +27,12 @@ interface RegistroDao {
     @Query("UPDATE registros_terreno SET observacionesFoliares = :texto, sincronizado = 0 WHERE id = :registroId")
     suspend fun actualizarObservaciones(registroId: Long, texto: String)
 
+    @Query("UPDATE registros_terreno SET remoteId = :remoteId, sincronizado = 1 WHERE id = :registroId")
+    suspend fun marcarSincronizado(registroId: Long, remoteId: Long)
+
     @Query("DELETE FROM registros_terreno WHERE id = :registroId")
     suspend fun eliminarPorId(registroId: Long)
 
-    @Query("UPDATE registros_terreno SET sincronizado = 1 WHERE sincronizado = 0")
-    suspend fun marcarTodosSincronizados()
+    @Query("UPDATE registros_terreno SET sincronizado = 1 WHERE id IN (:ids)")
+    suspend fun marcarComoSincronizados(ids: List<Long>)
 }

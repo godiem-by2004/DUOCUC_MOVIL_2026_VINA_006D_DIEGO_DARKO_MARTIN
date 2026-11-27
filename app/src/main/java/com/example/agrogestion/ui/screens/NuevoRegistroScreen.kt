@@ -88,6 +88,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import coil.compose.AsyncImage
 import com.example.agrogestion.model.CatalogoAgronomico
+import com.example.agrogestion.model.PredioInfo
 import com.example.agrogestion.util.FormatoCoordenada
 import com.example.agrogestion.util.FotoFoliarStorage
 import com.example.agrogestion.viewmodel.EstadoGps
@@ -112,6 +113,7 @@ import com.example.agrogestion.viewmodel.ValidacionCampo
 
 @Composable
 fun NuevoRegistroScreen(
+    prediosDisponibles: List<PredioInfo>,
     formState: FormularioUiState,
     pendientesRoom: Int,
     onPredioChange: (String) -> Unit,
@@ -722,7 +724,7 @@ fun NuevoRegistroScreen(
                         SelectorAgro(
                             etiqueta = "Predio Agrícola",
                             valor = formState.predio,
-                            opciones = CatalogoAgronomico.prediosDisponibles.map { it.nombre },
+                            opciones = prediosDisponibles.map { it.nombre },
                             onSeleccion = onPredioChange
                         )
 
@@ -1057,6 +1059,7 @@ private fun obtenerUbicacionNativa(
 fun NuevoRegistroScreenPreview() {
     AgroGestionTheme {
         NuevoRegistroScreen(
+            prediosDisponibles = com.example.agrogestion.model.CatalogoAgronomico.prediosDisponibles,
             formState = FormularioUiState(),
             pendientesRoom = 4,
             onPredioChange = {},

@@ -42,8 +42,24 @@ public class RegistroTerrenoController {
 
     @PostMapping("/sync")
     public ResponseEntity<List<RegistroTerreno>> sincronizarLote(@RequestBody List<RegistroTerreno> pendientes) {
-        pendientes.forEach(r -> r.setId(null));
-        return ResponseEntity.ok(repository.saveAll(pendientes));
+        for (RegistroTerreno r : pendientes) {
+            if (r.getLocalId() != null) {
+                repository.findByLocalId(r.getLocalId()).ifPresentOrElse(
+                    existente -> {
+                        r.setId(existente.getId());
+                        repository.save(r);
+                    },
+                    () -> {
+                        r.setId(null);
+                        repository.save(r);
+                    }
+                );
+            } else {
+                r.setId(null);
+                repository.save(r);
+            }
+        }
+        return ResponseEntity.ok(pendientes);
     }
 
     @PutMapping("/{id}")

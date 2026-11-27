@@ -26,6 +26,7 @@ class AgronomicoRepositoryTest {
     private lateinit var dao: RegistroDao
     private lateinit var agroApi: AgroApiService
     private lateinit var climaApi: ClimaApiService
+    private lateinit var catalogoApi: com.example.agrogestion.data.remote.CatalogoApiService
     private lateinit var repository: AgronomicoRepository
 
     private val muestraBase = RegistroEntity(
@@ -54,8 +55,9 @@ class AgronomicoRepositoryTest {
         dao = mockk(relaxed = true)
         agroApi = mockk(relaxed = true)
         climaApi = mockk(relaxed = true)
+        catalogoApi = mockk(relaxed = true)
         every { dao.obtenerTodos() } returns flowOf(listOf(muestraBase))
-        repository = AgronomicoRepository(dao, agroApi, climaApi)
+        repository = AgronomicoRepository(dao, agroApi, catalogoApi, climaApi)
     }
 
     @Test
@@ -87,7 +89,6 @@ class AgronomicoRepositoryTest {
         assertEquals(10L, id)
         coVerify {
             dao.insertar(match { it.recomendacion.contains("+20 kg/ha N") && it.recomendacion.contains("+20 kg/ha K₂O") })
-            dao.marcarTodosSincronizados()
         }
     }
 
@@ -99,7 +100,6 @@ class AgronomicoRepositoryTest {
         val id = repository.guardarMuestra(muestraBase.copy(nitrogeno = 120.0, potasio = 180.0))
 
         assertEquals(11L, id)
-        coVerify(exactly = 0) { dao.marcarTodosSincronizados() }
     }
 
     @Test
@@ -111,17 +111,17 @@ class AgronomicoRepositoryTest {
         assertTrue(resultado)
         coVerify {
             agroApi.sincronizarLote(match { it.size == 1 })
-            dao.marcarTodosSincronizados()
         }
     }
 
     @Test
-    fun `sincronizarPendientes retorna false ante error de red`() = runTest {
+    fun `sincronizarPendientes lanza excepcion ante error de red`() = runTest {
         coEvery { agroApi.sincronizarLote(any()) } throws RuntimeException("Sin red")
 
-        val resultado = repository.sincronizarPendientes()
+        val result = runCatching { repository.sincronizarPendientes() }
 
-        assertFalse(resultado)
+        assertTrue(result.isFailure)
+        assertEquals("Sin red", result.exceptionOrNull()?.message)
     }
 
     @Test
@@ -134,9 +134,7 @@ class AgronomicoRepositoryTest {
 
         coVerify {
             dao.actualizarObservaciones(1L, "Nueva nota foliar")
-            agroApi.actualizarRegistro(1L, any())
             dao.eliminarPorId(1L)
-            agroApi.eliminarRegistro(1L)
         }
     }
 
@@ -149,5 +147,59 @@ class AgronomicoRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals(22.4, result.getOrNull()?.temperaturaCelsius ?: 0.0, 0.01)
+    }
+
+    @Test
+    fun `obtenerPrediosCatalogo mapea correctamente y maneja errores`() = runTest {
+        // Exito
+        val mockData = listOf(mapOf<String, Any>("id" to "p1", "nombre" to "P1", "ubicacion" to "U1", "cultivo" to "C1", "superficieHa" to 10.0))
+        coEvery { catalogoApi.obtenerPredios() } returns mockData
+        val result = repository.obtenerPrediosCatalogo()
+        assertTrue(result.isSuccess)
+        assertEquals("p1", result.getOrNull()?.first()?.id)
+
+        // Error
+        coEvery { catalogoApi.obtenerPredios() } throws RuntimeException("Error catalogo")
+        assertTrue(repository.obtenerPrediosCatalogo().isFailure)
+    }
+
+    @Test
+    fun `refrescarDesdeServidor maneja exito y error`() = runTest {
+        // Exito
+        val dto = com.example.agrogestion.data.remote.RegistroDto(predio = "P1", ubicacion = "U1", cuartel = "C1", cultivo = "Cu1", etapa = "E1", ph = 6.0, ec = 1.0, nitrogeno = 1.0, fosforo = 1.0, potasio = 1.0, calcio = 1.0, magnesio = 1.0, latitud = 1.0, longitud = 1.0, observacionesFoliares = "obs", fechaMillis = 100)
+        coEvery { agroApi.obtenerRegistros() } returns listOf(dto)
+        assertTrue(repository.refrescarDesdeServidor())
+        coVerify(exactly = 1) { dao.insertar(any()) }
+
+        // Error
+        coEvery { agroApi.obtenerRegistros() } throws RuntimeException("Error refrescar")
+        assertFalse(repository.refrescarDesdeServidor())
+    }
+
+    @Test
+    fun `obtenerClimaPredio falla si current es null`() = runTest {
+        coEvery { climaApi.obtenerClimaActual(any(), any(), any()) } returns OpenMeteoResponse(null)
+        val result = repository.obtenerClimaPredio(0.0, 0.0)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `sincronizarPendientes retorna true si no hay pendientes`() = runTest {
+        val muestraSincronizada = muestraBase.copy(sincronizado = true)
+        every { dao.obtenerTodos() } returns flowOf(listOf(muestraSincronizada))
+        assertTrue(repository.sincronizarPendientes())
+        coVerify(exactly = 0) { agroApi.sincronizarLote(any()) }
+    }
+
+    @Test
+    fun `actualizarObservaciones y eliminarRegistro no llaman a la API si remoteId es null`() = runTest {
+        val muestraSinRemoteId = muestraBase.copy(id = 2L, remoteId = null)
+        every { dao.obtenerTodos() } returns flowOf(listOf(muestraSinRemoteId))
+        
+        repository.actualizarObservaciones(2L, "nota")
+        repository.eliminarRegistro(2L)
+        
+        coVerify(exactly = 0) { agroApi.actualizarRegistro(any(), any()) }
+        coVerify(exactly = 0) { agroApi.eliminarRegistro(any()) }
     }
 }
